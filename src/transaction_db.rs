@@ -249,6 +249,11 @@ impl TransactionDB {
     pub fn path(&self) -> &Path {
         &self.path.as_path()
     }
+
+    /// The sequence number of the most recent transaction.
+    pub fn latest_sequence_number(&self) -> u64 {
+        unsafe { ffi::rocksdb_transactiondb_get_latest_sequence_number(self.inner) }
+    }
 }
 
 impl GetColumnFamilies for TransactionDB {
