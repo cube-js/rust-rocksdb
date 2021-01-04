@@ -11,17 +11,10 @@
 // limitations under the License.
 //
 
-use crate::{
-    ffi,
-    ffi_util::to_cpath,
-    handle::Handle,
-    ops::{
+use crate::{ColumnFamily, ColumnFamilyDescriptor, DBWALIterator, DEFAULT_COLUMN_FAMILY_NAME, Error, Options, Snapshot, TransactionDBOptions, ffi, ffi_util::to_cpath, handle::Handle, ops::{
         column_family::GetColumnFamilies,
         snapshot::SnapshotInternal,
-    },
-    ColumnFamily, ColumnFamilyDescriptor, Error, Options, Snapshot, TransactionDBOptions,
-    DEFAULT_COLUMN_FAMILY_NAME,
-};
+    }};
 
 // use ambassador::Delegate;
 // use delegate::delegate;
@@ -253,6 +246,27 @@ impl TransactionDB {
     /// The sequence number of the most recent transaction.
     pub fn latest_sequence_number(&self) -> u64 {
         unsafe { ffi::rocksdb_transactiondb_get_latest_sequence_number(self.inner) }
+    }
+
+    /// Iterate over batches of write operations since a given sequence.
+    ///
+    /// Produce an iterator that will provide the batches of write operations
+    /// that have occurred since the given sequence (see
+    /// `latest_sequence_number()`). Use the provided iterator to retrieve each
+    /// (`u64`, `WriteBatch`) tuple, and then gather the individual puts and
+    /// deletes using the `WriteBatch::iterate()` function.
+    ///
+    /// Calling `get_updates_since()` with a sequence number that is out of
+    /// bounds will return an error.
+    pub fn get_updates_since(&self, seq_number: u64) -> Result<DBWALIterator, Error> {
+        unsafe {
+            // rocksdb_wal_readoptions_t does not appear to have any functions
+            // for creating and destroying it; fortunately we can pass a nullptr
+            // here to get the default behavior
+            let opts: *const ffi::rocksdb_wal_readoptions_t = ptr::null();
+            let iter = ffi_try!(ffi::rocksdb_transactiondb_get_updates_since(self.inner, seq_number, opts));
+            Ok(DBWALIterator { inner: iter })
+        }
     }
 }
 
