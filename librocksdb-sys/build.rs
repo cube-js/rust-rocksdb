@@ -34,13 +34,29 @@ fn rocksdb_include_dir() -> String {
 }
 
 fn bindgen_rocksdb() {
-    let bindings = bindgen::Builder::default()
+    let mut bindgen = bindgen::Builder::default()
         .header(rocksdb_include_dir() + "/rocksdb/c.h")
         .derive_debug(false)
         .blocklist_type("max_align_t") // https://github.com/rust-lang-nursery/rust-bindgen/issues/550
         .ctypes_prefix("libc")
-        .size_t_is_usize(true)
-        .generate()
+        .size_t_is_usize(true);
+
+    let target = env::var("TARGET").unwrap();
+
+    // https://github.com/rust-rocksdb/rust-rocksdb/issues/550
+    let bindgen = if target.contains("aarch64") && target.contains("linux") {
+        if target.contains("gnu") {
+            bindgen.clang_arg("-I/usr/aarch64-linux-gnu/include/")
+        } else if target.contains("musl") {
+            bindgen.clang_arg("-I/usr/aarch64-linux-musl/include/")
+        } else {
+            bindgen
+        }
+    } else {
+        bindgen
+    };
+
+    let bindings = bindgen.generate()
         .expect("unable to generate rocksdb bindings");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
